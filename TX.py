@@ -1,5 +1,6 @@
 import numpy as np
 import tkinter as tk
+import socket
 from tkinter import ttk
 from math import ceil
 
@@ -67,7 +68,16 @@ def String2BinArray (string):
         temp = np.append(temp , converted)
     
     return temp
-    
+
+def SendThroughUDP (string):
+    host = '192.168.137.31'
+    port = 13000
+    addr = (host, port)
+    UDPSock = socket.socket (socket.AF_INET,socket.SOCK_DGRAM)
+    #string = bytes (string, 'UTF-8')
+    UDPSock.sendto (string, addr)  
+    UDPSock.close()
+   
 class My_GUI (tk.Tk):
     
     def __init__(self, *args, **kwargs):
@@ -97,7 +107,7 @@ class StartPage (tk.Frame):
     def __init__ (self, parent, controller):
         tk.Frame.__init__(self, parent)
         label = tk.Label(self, text = "Enter message to send:", font = LARGE_FONT)
-        label.pack(pady = 10, padx =10)
+        label.pack(side = "top" ,fill = "both")#(pady = 10, padx =10)
         self.widget = None
         
         #Display Empty Graph
@@ -111,7 +121,7 @@ class StartPage (tk.Frame):
             self.widget = canvas.get_tk_widget()        
             self.widget.pack(side = "bottom" ,fill = "both")
         
-        InitiateGraph()
+        #InitiateGraph()
             
         #Display The Graph
         def DisplayConstalation (table):
@@ -164,7 +174,7 @@ class StartPage (tk.Frame):
             else: 
                 MyTable = SpiralQAMTable
 
-            DisplayConstalation(MyTable)
+            #DisplayConstalation(MyTable)
 
         var = tk.IntVar()
         R1 = ttk.Radiobutton(self, text="16-QAM", variable=var, value=1,
@@ -177,7 +187,7 @@ class StartPage (tk.Frame):
 
    
         def ModulationAndSend (MyString, mapping_table):
-            file = open('testfile.txt','w') 
+           # file = open('testfile.txt','w') 
   
             data_bits = String2BinArray (MyString)
             
@@ -203,13 +213,9 @@ class StartPage (tk.Frame):
             
             #Paralle to Serial
             OFDM_TX_Serial = OFDM_TX.reshape ( (K+CP)*N_block, 1)
+
+            Data_TX = OFDM_TX_Serial.tostring()
+            SendThroughUDP(Data_TX)
             
-            for i in np.arange(len(OFDM_TX_Serial)) :
-                file.write(str(OFDM_TX_Serial[i].real)) 
-                file.write(str(OFDM_TX_Serial[i].imag)) 
-                
-            file.close()
-        
-        
 app = My_GUI()
 app.mainloop()
