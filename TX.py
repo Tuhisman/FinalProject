@@ -70,7 +70,7 @@ def String2BinArray (string):
     return temp
 
 def SendThroughUDP (string):
-    host = '192.168.137.31'
+    host = '192.168.137.1'
     port = 13000
     addr = (host, port)
     UDPSock = socket.socket (socket.AF_INET,socket.SOCK_DGRAM)
