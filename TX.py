@@ -3,6 +3,9 @@ import tkinter as tk
 import socket
 from tkinter import ttk
 from math import ceil
+from scipy import ndimage
+from math import sqrt
+from PIL import Image,ImageTk  
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg#, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
@@ -60,6 +63,7 @@ SpiralQAMTable = {
 }
 
 def String2BinArray (string):
+    
     temp = np.zeros(0,dtype = int)
     for c in string:
         bits = bin(ord(c))[2:]
@@ -70,14 +74,47 @@ def String2BinArray (string):
     return temp
 
 def SendThroughUDP (string):
-    host = '192.168.137.1'
+    
+    host = '192.168.137.31'
     port = 13000
     addr = (host, port)
     UDPSock = socket.socket (socket.AF_INET,socket.SOCK_DGRAM)
     #string = bytes (string, 'UTF-8')
     UDPSock.sendto (string, addr)  
     UDPSock.close()
-   
+
+def AddAWGN (OFDM_TX_Serial,N_block,EbN0bd):
+    
+    EsN0dB = EbN0bd + 10*np.log10(qam_order)+ 10*np.log10(K/(K+CP))
+    signal_energy1 = np.mean(abs(OFDM_TX_Serial)**2)
+    N0 = signal_energy1/(10**(EsN0dB/10))
+    std=sqrt(N0/2)
+    noise = np.random.normal(0, std, N_block*(K+CP))+1j*np.random.normal(0, std, N_block*(K+CP))
+
+    return OFDM_TX_Serial #+ noise
+
+def Img2BitsVec (pic_mat):
+    pic_mat = np.array (pic_mat)
+    img_bit_reshape = pic_mat.reshape( len(pic_mat[0]) * len(pic_mat[0]),1 )
+    temp = np.zeros(0,dtype = int)
+    
+    for color in img_bit_reshape:
+        bits = bin(color[0])[2:]
+        bits = '00000000'[len(bits):] + bits
+        converted = np.fromstring(bits,'u1') - ord('0')
+        temp = np.append(temp,converted)
+    return temp
+
+def BitsVec2Img(bits_vec):
+    
+    bit_array_reshape = bits_vec.reshape(int(len (bits_vec)/8),8)
+    b2i = (2**np.arange(len(bit_array_reshape[0])))
+    b2i = b2i[::-1]
+    result = (bit_array_reshape*b2i).sum(axis=1)
+    result_reshape = result.reshape(int(sqrt(len(result))),int(sqrt(len(result))))
+    
+    return result_reshape
+
 class My_GUI (tk.Tk):
     
     def __init__(self, *args, **kwargs):
@@ -121,7 +158,7 @@ class StartPage (tk.Frame):
             self.widget = canvas.get_tk_widget()        
             self.widget.pack(side = "bottom" ,fill = "both")
         
-        #InitiateGraph()
+        InitiateGraph()
             
         #Display The Graph
         def DisplayConstalation (table):
@@ -174,7 +211,7 @@ class StartPage (tk.Frame):
             else: 
                 MyTable = SpiralQAMTable
 
-            #DisplayConstalation(MyTable)
+            DisplayConstalation(MyTable)
 
         var = tk.IntVar()
         R1 = ttk.Radiobutton(self, text="16-QAM", variable=var, value=1,
@@ -187,9 +224,10 @@ class StartPage (tk.Frame):
 
    
         def ModulationAndSend (MyString, mapping_table):
-           # file = open('testfile.txt','w') 
-  
-            data_bits = String2BinArray (MyString)
+            pic_mat=Image.open("pi40.png").convert("L")
+            data_bits = Img2BitsVec (pic_mat)
+            
+            #data_bits = String2BinArray (MyString)
             
             bits_reshape = data_bits.reshape(int((len(data_bits))/qam_order) ,qam_order)
             mapped_bits = np.array([mapping_table[tuple(b)] for b in bits_reshape])
@@ -213,8 +251,13 @@ class StartPage (tk.Frame):
             
             #Paralle to Serial
             OFDM_TX_Serial = OFDM_TX.reshape ( (K+CP)*N_block, 1)
-
-            Data_TX = OFDM_TX_Serial.tostring()
+            
+            EbN0bd = 15
+            
+            OFDM_Noise = AddAWGN (OFDM_TX_Serial , N_block, EbN0bd)
+            
+            Data_TX = OFDM_Noise.tostring()
+            
             SendThroughUDP(Data_TX)
             
 app = My_GUI()
