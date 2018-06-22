@@ -134,8 +134,13 @@ class StartPage (tk.Frame):
         label.pack(pady = 10, padx =10)
         self.widget = None
 
-        def Demodulation (data_RX,MyTable):
-            demapping_table = {v : k for k, v in MyTable.items()}
+        def Demodulation (data_RX,TableIndex,NdataCarr):
+            
+            if (TableIndex==1):
+                demapping_table = {v : k for k, v in QAM16Table.items()}
+            else:
+                demapping_table = {v : k for k, v in SpiralQAMTable.items()}
+                
             constellation = np.array([x for x in demapping_table.keys()])
             
             N_block = ceil(len(data_RX)/(K+CP))
@@ -151,12 +156,12 @@ class StartPage (tk.Frame):
           
             #Demapping
             data_rec = OFDM_postFFT [:,dataCarriers]
-            print ('before trim' , len(data_rec))
-            print (data_rec)
-            data_rec = np.transpose(data_rec)
-            data_rec = np.trim_zeros(data_rec, 'b')
-            print ('after trim ' ,len(data_rec))
-            print (data_rec)
+#            print ('before trim' , len(data_rec))
+#            print (data_rec)
+#            data_rec = np.transpose(data_rec)
+#            data_rec = np.trim_zeros(data_rec, 'b')
+#            print ('after trim ' ,len(data_rec))
+#            print (data_rec)
             data_rec_reshape = data_rec.reshape(len(dataCarriers)*N_block,1)
             
             distance = abs(data_rec_reshape.reshape((-1,1)) - constellation.reshape((1,-1)))
@@ -170,35 +175,64 @@ class StartPage (tk.Frame):
             # paralle -> serial
             bit_rec = bit_rec.reshape((-1,))
             
-            img_rec = BitsVec2Img(bit_rec)
-            photo=ImageTk.PhotoImage(img_rec)
+#            img_rec = BitsVec2Img(bit_rec)
+#            photo=ImageTk.PhotoImage(img_rec)
+#            
+#            f = Figure (figsize = (4,4),dpi = 100)
+#            plt = f.add_subplot(111)
+#            plt.imshow(photo,cmap='gray')
+#            plt.grid(False)
+#            canvas = FigureCanvasTkAgg (f,self)              
+#            self.widget = canvas.get_tk_widget()        
+#            self.widget.pack(side = "bottom" ,fill = "both")
+#            
+#            string_rec = BinArray2String (bit_rec)
+#            print (string_rec)
+#            bit_test = bit_rec1[:10]
+
+            return bit_rec[:(NdataCarr*qam_order)]
             
-            f = Figure (figsize = (4,4),dpi = 100)
-            plt = f.add_subplot(111)
-            plt.imshow(photo,cmap='gray')
-            plt.grid(False)
-            canvas = FigureCanvasTkAgg (f,self)              
-            self.widget = canvas.get_tk_widget()        
-            self.widget.pack(side = "bottom" ,fill = "both")
-            
-            string_rec = BinArray2String (bit_rec)
-            print (string_rec)
-            return (string_rec)
-            
-        def ReceiveThroughUDP()    :
+        def ReceiveData()    :
             host = ""
             port = 13000
             buf = 65536
             addr = (host,port)
             UDPSock = socket.socket (socket.AF_INET,socket.SOCK_DGRAM)
             UDPSock.bind(addr)
-            (data,addr) = UDPSock.recvfrom(buf)
-            data_RX = np.fromstring(data, dtype = complex)
-            message = Demodulation (data_RX,MyTable)
+            (settings,addr) = UDPSock.recvfrom(buf)
+            settings_rec = np.fromstring(settings, dtype = int)
             
+            #settings_rec = [mapping_table,N_block,Last_Block_Lenght]
+            data_bits_rec = np.array([])
+            
+            for block in np.arange(settings_rec[1]):
+                (data,addr) = UDPSock.recvfrom(buf)
+                data_rec = np.fromstring(data, dtype = complex)
+                if (block!=(settings_rec[1]-1)):
+                    temp_data = Demodulation (data_rec,settings_rec[0],52)
+                else:
+                    temp_data = Demodulation (data_rec,settings_rec[0],settings_rec[2])
+                    
+                data_bits_rec = np.append(data_bits_rec , temp_data)
+                
             UDPSock.close()
-            TextBox.insert (0.0 , message)
-    
+            
+            if (settings_rec[1]>20):
+                message = BinArray2String (data_bits_rec)
+                TextBox.insert (0.0 , message)
+            else:
+                img_rec = BitsVec2Img(data_bits_rec)
+                photo=ImageTk.PhotoImage(img_rec)
+                
+                f = Figure (figsize = (4,4),dpi = 100)
+                plt = f.add_subplot(111)
+                plt.imshow(photo,cmap='gray')
+                plt.grid(False)
+                canvas = FigureCanvasTkAgg (f,self)              
+                self.widget = canvas.get_tk_widget()        
+                self.widget.pack(side = "bottom" ,fill = "both")
+                
+                
         #Choose The Constallation
         def sel():
             global MyTable
@@ -218,7 +252,7 @@ class StartPage (tk.Frame):
         R2.pack(side = "top")
         
         SendButton = ttk.Button(self,text= "Press to Listen", 
-                            command = lambda: ReceiveThroughUDP())
+                            command = lambda: ReceiveData())
         SendButton.pack(side = "top")
         
         TextBox = tk.Text (self, width =35 , height = 5)

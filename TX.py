@@ -73,14 +73,18 @@ def String2BinArray (string):
     
     return temp
 
-def SendThroughUDP (string):
+def SendData (Data,Settings,Noise):
     
-    host = '192.168.137.31'
+    host = '192.168.137.1'
     port = 13000
     addr = (host, port)
     UDPSock = socket.socket (socket.AF_INET,socket.SOCK_DGRAM)
-    #string = bytes (string, 'UTF-8')
-    UDPSock.sendto (string, addr)  
+    UDPSock.sendto (Settings, addr) 
+    
+    for block in np.arange(Settings[1]):
+        Data_Noise = AddAWGN (Data[block,:] , 1, Noise)
+        UDPSock.sendto (Data_Noise.tostring(), addr)
+        
     UDPSock.close()
 
 def AddAWGN (OFDM_TX_Serial,N_block,EbN0bd):
@@ -207,11 +211,13 @@ class StartPage (tk.Frame):
             global MyTable
             
             if (var.get() == 1):
-                MyTable = QAM16Table
+                MyTable = 1 # for 16QAM
+                DisplayConstalation(QAM16Table)
             else: 
-                MyTable = SpiralQAMTable
+                MyTable = 2 # for Spiral QAM
+                DisplayConstalation(SpiralQAMTable)
 
-            DisplayConstalation(MyTable)
+            #DisplayConstalation(MyTable)
 
         var = tk.IntVar()
         R1 = ttk.Radiobutton(self, text="16-QAM", variable=var, value=1,
@@ -224,16 +230,25 @@ class StartPage (tk.Frame):
 
    
         def ModulationAndSend (MyString, mapping_table):
-            pic_mat=Image.open("pi40.png").convert("L")
-            data_bits = Img2BitsVec (pic_mat)
+            #pic_mat=Image.open("pi40.png").convert("L")
+            #data_bits = Img2BitsVec (pic_mat)
             
-            #data_bits = String2BinArray (MyString)
+            data_bits = String2BinArray (MyString)
             
             bits_reshape = data_bits.reshape(int((len(data_bits))/qam_order) ,qam_order)
-            mapped_bits = np.array([mapping_table[tuple(b)] for b in bits_reshape])
+            
+            if (mapping_table == 1):
+                mapped_bits = np.array([QAM16Table[tuple(b)] for b in bits_reshape])
+            else:
+                mapped_bits = np.array([SpiralQAMTable[tuple(b)] for b in bits_reshape])
+                
+            print ("mapped_bits",  len(mapped_bits))
             
             N_block = ceil(len(mapped_bits)/(len(dataCarriers)))
+            Last_Block_Lenght = len(mapped_bits)%len(dataCarriers)
             
+            print ("N_block",  N_block)
+            print ("dataCarriers",  len(mapped_bits)%len(dataCarriers))
             if (len(mapped_bits)%len(dataCarriers))!= 0 :
                 mapped_bits = np.append(mapped_bits, np.zeros((len(dataCarriers)-(len(mapped_bits)%len(dataCarriers))),dtype = complex))
                 
@@ -248,17 +263,25 @@ class StartPage (tk.Frame):
             #adding cycle prefix
             CP_values = OFDM_ifft[:,K-CP:K]
             OFDM_TX = np.concatenate((CP_values, OFDM_ifft), axis=1)
+#            print ("OFDM_TX",  OFDM_TX.shape)
+#            print ("OFDM_TX[0]",  OFDM_TX[0,:], "LENGHt" , len (OFDM_TX[0,:]))
+#            print ("OFDM_TX[1]",  OFDM_TX[1,:], "LENGHt" , len (OFDM_TX[1,:]))
             
             #Paralle to Serial
-            OFDM_TX_Serial = OFDM_TX.reshape ( (K+CP)*N_block, 1)
+          #  OFDM_TX_Serial = OFDM_TX.reshape ( 1, (K+CP)*N_block)
+           # print ("OFDM_TX_Serial",  OFDM_TX_Serial.shape)
+            EbN0db = 5
             
-            EbN0bd = 15
+           # OFDM_Noise = AddAWGN (OFDM_TX_Serial , N_block, EbN0db)
+           # print ("OFDM_Noise",  OFDM_Noise.shape)
             
-            OFDM_Noise = AddAWGN (OFDM_TX_Serial , N_block, EbN0bd)
+           # Data_TX = OFDM_Noise.tostring()
+           # print ("Data_TX",  len (Data_TX))
             
-            Data_TX = OFDM_Noise.tostring()
+            SettingsData_TX = np.array([mapping_table,N_block,Last_Block_Lenght])#.tostring()
             
-            SendThroughUDP(Data_TX)
+            SendData(OFDM_TX,SettingsData_TX,EbN0db)
+            
             
 app = My_GUI()
 app.mainloop()
