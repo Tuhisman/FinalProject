@@ -162,7 +162,7 @@ class StartPage (tk.Frame):
             self.widget = canvas.get_tk_widget()        
             self.widget.pack(side = "bottom" ,fill = "both")
         
-        InitiateGraph()
+        #InitiateGraph()
             
         #Display The Graph
         def DisplayConstalation (table):
@@ -199,7 +199,8 @@ class StartPage (tk.Frame):
                 TextBox.insert(1,"Enter message here")
                 
             
-        TextBox = ttk.Entry(self, text = "Enter a Text message to send")
+        TextBox = tk.Entry(self, text = "Enter a Text message to send")
+      #  TextBox.config (background = "yellow")
         TextBox.pack(side = "top")
 
         SendButton = ttk.Button(self,text= "Send", 
@@ -212,10 +213,10 @@ class StartPage (tk.Frame):
             
             if (var.get() == 1):
                 MyTable = 1 # for 16QAM
-                DisplayConstalation(QAM16Table)
+                #DisplayConstalation(QAM16Table)
             else: 
                 MyTable = 2 # for Spiral QAM
-                DisplayConstalation(SpiralQAMTable)
+                #DisplayConstalation(SpiralQAMTable)
 
             #DisplayConstalation(MyTable)
 
@@ -230,10 +231,22 @@ class StartPage (tk.Frame):
 
    
         def ModulationAndSend (MyString, mapping_table):
-            #pic_mat=Image.open("pi40.png").convert("L")
-            #data_bits = Img2BitsVec (pic_mat)
+            pic_mat=Image.open("pi40.png").convert("L")
+            data_bits = Img2BitsVec (pic_mat)
             
-            data_bits = String2BinArray (MyString)
+            ###########TEST################
+            photo = BitsVec2Img(data_bits)
+            #photo=ImageTk.PhotoImage(Image.fromarray(img_rec,"L"))
+            f = Figure (figsize = (4,4),dpi = 100)
+            plt = f.add_subplot(111)
+            plt.imshow(photo, cmap='gray')
+            plt.grid(False)
+            canvas = FigureCanvasTkAgg (f,self)              
+            self.widget = canvas.get_tk_widget()        
+            self.widget.pack(side = "bottom" ,fill = "both")            
+            ################################
+            
+            #data_bits = String2BinArray (MyString)
             
             bits_reshape = data_bits.reshape(int((len(data_bits))/qam_order) ,qam_order)
             
@@ -245,10 +258,18 @@ class StartPage (tk.Frame):
             print ("mapped_bits",  len(mapped_bits))
             
             N_block = ceil(len(mapped_bits)/(len(dataCarriers)))
-            Last_Block_Lenght = len(mapped_bits)%len(dataCarriers)
+            
+            #Last_Block_Lenght = len(mapped_bits)%len(dataCarriers)
+            
+            if (len(mapped_bits)%len(dataCarriers)):
+                Last_Block_Lenght = len(mapped_bits)%len(dataCarriers)
+            else:
+                Last_Block_Lenght = len(dataCarriers)
+                
+            print ("Last_Block_Lenght:" ,Last_Block_Lenght)
             
             print ("N_block",  N_block)
-            print ("dataCarriers",  len(mapped_bits)%len(dataCarriers))
+
             if (len(mapped_bits)%len(dataCarriers))!= 0 :
                 mapped_bits = np.append(mapped_bits, np.zeros((len(dataCarriers)-(len(mapped_bits)%len(dataCarriers))),dtype = complex))
                 

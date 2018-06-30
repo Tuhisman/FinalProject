@@ -174,7 +174,7 @@ class StartPage (tk.Frame):
           
             # paralle -> serial
             bit_rec = bit_rec.reshape((-1,))
-            
+            #print ("bits in demodulation:" , bit_rec)
 #            img_rec = BitsVec2Img(bit_rec)
 #            photo=ImageTk.PhotoImage(img_rec)
 #            
@@ -201,55 +201,63 @@ class StartPage (tk.Frame):
             UDPSock.bind(addr)
             (settings,addr) = UDPSock.recvfrom(buf)
             settings_rec = np.fromstring(settings, dtype = int)
-            
+            #print ("setteings data:" ,settings_rec)
             #settings_rec = [mapping_table,N_block,Last_Block_Lenght]
             data_bits_rec = np.array([])
             
             for block in np.arange(settings_rec[1]):
                 (data,addr) = UDPSock.recvfrom(buf)
                 data_rec = np.fromstring(data, dtype = complex)
+                #print ("data:" ,data_rec)
                 if (block!=(settings_rec[1]-1)):
                     temp_data = Demodulation (data_rec,settings_rec[0],52)
+                    #print ("temp_data: " ,temp_data)
                 else:
                     temp_data = Demodulation (data_rec,settings_rec[0],settings_rec[2])
-                    
+                    #print ("temp_data: " ,temp_data)
+                
                 data_bits_rec = np.append(data_bits_rec , temp_data)
                 
             UDPSock.close()
             
-            if (settings_rec[1]>20):
+            data_bits_rec = data_bits_rec.astype(int)
+            #print ("data bits:" ,data_bits_rec)
+            
+            if (settings_rec[1]<20):
                 message = BinArray2String (data_bits_rec)
                 TextBox.insert (0.0 , message)
             else:
-                img_rec = BitsVec2Img(data_bits_rec)
-                photo=ImageTk.PhotoImage(img_rec)
-                
+                photo = BitsVec2Img(data_bits_rec)
+                #print (img_rec)
+                #photo=ImageTk.PhotoImage(Image.fromarray(img_rec,"L"))
+                #print (img_rec)
                 f = Figure (figsize = (4,4),dpi = 100)
                 plt = f.add_subplot(111)
                 plt.imshow(photo,cmap='gray')
                 plt.grid(False)
+                plt.axis('off')
                 canvas = FigureCanvasTkAgg (f,self)              
                 self.widget = canvas.get_tk_widget()        
                 self.widget.pack(side = "bottom" ,fill = "both")
                 
                 
         #Choose The Constallation
-        def sel():
-            global MyTable
-            
-            if (var.get() == 1):
-                MyTable = QAM16Table
-            else: 
-                MyTable = SpiralQAMTable
-
-        var = tk.IntVar()
-        R1 = ttk.Radiobutton(self, text="16-QAM", variable=var, value=1,
-                          command= lambda : sel ())
-        R1.pack(side = "top")
-        
-        R2 = ttk.Radiobutton(self, text="Spiral QAM", variable=var, value=2,
-                          command= lambda : sel ())
-        R2.pack(side = "top")
+#        def sel():
+#            global MyTable
+#            
+#            if (var.get() == 1):
+#                MyTable = QAM16Table
+#            else: 
+#                MyTable = SpiralQAMTable
+#
+#        var = tk.IntVar()
+#        R1 = ttk.Radiobutton(self, text="16-QAM", variable=var, value=1,
+#                          command= lambda : sel ())
+#        R1.pack(side = "top")
+#        
+#        R2 = ttk.Radiobutton(self, text="Spiral QAM", variable=var, value=2,
+#                          command= lambda : sel ())
+#        R2.pack(side = "top")
         
         SendButton = ttk.Button(self,text= "Press to Listen", 
                             command = lambda: ReceiveData())
