@@ -23,6 +23,7 @@ allCarriers = np.arange(K)  # array of carriers lenght [0-63]
 guardCarriers = np.array([0, 1, 2, 3, 4 ,5 ,58, 59, 60, 61 , 62 ,63]) #guard location
 dataCarriers = np.delete(allCarriers, guardCarriers) #all the remaining are data
 EbN0db = 0
+PhaseNoise = 0
 MyTable = 1
 FinalPage = ""
 Data_TT = ""
@@ -127,8 +128,10 @@ def BitsVec2Img(bits_vec):
 def ModulationAndSend ():
     if type(Data_TT) is str :
         data_bits = String2BinArray (Data_TT)
+        DataType = 1
     else:
         data_bits = Img2BitsVec (Data_TT)
+        DataType = 2
 
     bits_reshape = data_bits.reshape(int((len(data_bits))/qam_order) ,qam_order)
     
@@ -159,7 +162,7 @@ def ModulationAndSend ():
     CP_values = OFDM_ifft[:,K-CP:K]
     OFDM_TX = np.concatenate((CP_values, OFDM_ifft), axis=1)
 
-    SettingsData_TX = np.array([MyTable,N_block,Last_Block_Lenght])
+    SettingsData_TX = np.array([MyTable,N_block,Last_Block_Lenght,DataType,PhaseNoise])
     
     SendData(OFDM_TX,SettingsData_TX)
         
@@ -171,7 +174,7 @@ class My_GUI (tk.Tk):
         
         tk.Tk.wm_title (self, "Final Project Valentin Paderov")
         
-        self.geometry("640x520")
+        self.geometry("640x540")
         
         container = tk.Frame(self)
         container.pack(side = "top" , fill = "both" ,expand = True)
@@ -179,9 +182,7 @@ class My_GUI (tk.Tk):
        # container.grid_columnconfigure(0, weight =1)
         container1 = tk.Frame(self)
         container1.pack(side = "top" , fill = "both" ,expand = True)
-        
-#        self.myParent = parent 
-#        self.myParent.geometry("640x400")
+
         self.frames = {}
         
         for F in (StartPage,PageOne,PageTwo):
@@ -215,15 +216,26 @@ class StartPage (tk.Frame):
         label3 = tk.Label(self, text = "Choose Eb/N0 (dB):", font = ("Verdana", 12))
         label3.pack(side = "top", fill = "both")#(row=2, column =0,padx = 0,pady=0, sticky ="nsew")
         
-        def GetScale(event):
+        def GetScaleEbN0(event):
             global EbN0db
             EbN0db = scale.get()
             
             
-        scale = tk.Scale(self,from_=0, to=20,orient=tk.HORIZONTAL , command = GetScale)
+        scale = tk.Scale(self,from_=0, to=15,orient=tk.HORIZONTAL , command = GetScaleEbN0)
         scale.set(10)
         scale.pack(side = "top", fill = "none")
         
+#        label4 = tk.Label(self, text = "Choose Phase Noise (deg):", font = ("Verdana", 12))
+#        label4.pack(side = "top", fill = "both")#(row=2, column =0,padx = 0,pady=0, sticky ="nsew")
+#        
+#        def GetScalePhaseNoise(event):
+#            global PhaseNoise
+#            PhaseNoise = scale1.get()
+#            
+#            
+#        scale1 = tk.Scale(self,from_=0, to=5,orient=tk.HORIZONTAL , command = GetScalePhaseNoise)
+#        scale1.set(0)
+#        scale1.pack(side = "top", fill = "none")        
 
         button2 = tk.Button (self,text= "Quit", command = lambda: quitgui ())
         button2.pack(side = "bottom",anchor = "s")
@@ -261,8 +273,6 @@ class StartPage (tk.Frame):
 
         
 class PageOne (tk.Frame):
-    
-    
     
     def __init__ (self, parent, controller):
         tk.Frame.__init__(self, parent)
@@ -330,14 +340,13 @@ class PageTwo (tk.Frame):
         label1.pack(side = "top",)#(row=1, column =0,padx = 0,pady=0, sticky ="nsew")
         
         var = tk.StringVar()
-        #var.set('blabla')
-        
+
         def FinalText(var) :
             if button3 ['text'] == 'Update' :
                 if type(Data_TT) is str :
-                    var.set ("The parameters and data selected is:\n EbN0 = "+str(EbN0db)+"\n Constallation: "+("16QAM \n" if MyTable==1 else "SpiralQAM \n")+"The text is: " + Data_TT)
+                    var.set ("The parameters and data selected is:\n EbN0 = "+str(EbN0db)+"\n Constallation: "+("16QAM \n" if MyTable==1 else "SpiralQAM \n")+"The text is: " + Data_TT)#+"Phase Noise = "+str(PhaseNoise)+"deg\n"
                 else:
-                    var.set ("The parameters and data selected is:\n EbN0 = "+str(EbN0db)+"\n Constallation: "+("16QAM \n" if MyTable==1 else "SpiralQAM \n")+"The Image is: ")
+                    var.set ("The parameters and data selected is:\n EbN0 = "+str(EbN0db)+"\n Constallation: "+("16QAM \n" if MyTable==1 else "SpiralQAM \n")+"The Image is: ")#+"Phase Noise = "+str(PhaseNoise)+"deg\n"
                     f = Figure (figsize = (1,1),dpi = 100)
                     plt = f.add_subplot(111)
                     plt.imshow(Data_TT, cmap='gray')
