@@ -81,12 +81,15 @@ def String2BinArray (string):
 
 def SendData (Data,Settings):
     
-    host = '192.168.137.1'
+    host = '192.168.137.1' #'169.254.133.233' #
     port = 13000
     addr = (host, port)
     UDPSock = socket.socket (socket.AF_INET,socket.SOCK_DGRAM)
     UDPSock.sendto (Settings, addr) 
-    
+
+    for block in np.arange(Settings[1]):
+        UDPSock.sendto (Data[block,:].tostring(), addr)
+        
     for block in np.arange(Settings[1]):
         Data_Noise = AddAWGN (Data[block,:] , 1, EbN0db)
         UDPSock.sendto (Data_Noise.tostring(), addr)
@@ -221,21 +224,21 @@ class StartPage (tk.Frame):
             EbN0db = scale.get()
             
             
-        scale = tk.Scale(self,from_=0, to=15,orient=tk.HORIZONTAL , command = GetScaleEbN0)
+        scale = tk.Scale(self,from_=0, to=20,orient=tk.HORIZONTAL , command = GetScaleEbN0)
         scale.set(10)
         scale.pack(side = "top", fill = "none")
         
-#        label4 = tk.Label(self, text = "Choose Phase Noise (deg):", font = ("Verdana", 12))
-#        label4.pack(side = "top", fill = "both")#(row=2, column =0,padx = 0,pady=0, sticky ="nsew")
-#        
-#        def GetScalePhaseNoise(event):
-#            global PhaseNoise
-#            PhaseNoise = scale1.get()
-#            
-#            
-#        scale1 = tk.Scale(self,from_=0, to=5,orient=tk.HORIZONTAL , command = GetScalePhaseNoise)
-#        scale1.set(0)
-#        scale1.pack(side = "top", fill = "none")        
+        label4 = tk.Label(self, text = "Choose Phase Noise (deg):", font = ("Verdana", 12))
+        label4.pack(side = "top", fill = "both")#(row=2, column =0,padx = 0,pady=0, sticky ="nsew")
+        
+        def GetScalePhaseNoise(event):
+            global PhaseNoise
+            PhaseNoise = scale1.get()
+            
+            
+        scale1 = tk.Scale(self,from_=0, to=15,orient=tk.HORIZONTAL , command = GetScalePhaseNoise)
+        scale1.set(0)
+        scale1.pack(side = "top", fill = "none")        
 
         button2 = tk.Button (self,text= "Quit", command = lambda: quitgui ())
         button2.pack(side = "bottom",anchor = "s")
@@ -344,9 +347,9 @@ class PageTwo (tk.Frame):
         def FinalText(var) :
             if button3 ['text'] == 'Update' :
                 if type(Data_TT) is str :
-                    var.set ("The parameters and data selected is:\n EbN0 = "+str(EbN0db)+"\n Constallation: "+("16QAM \n" if MyTable==1 else "SpiralQAM \n")+"The text is: " + Data_TT)#+"Phase Noise = "+str(PhaseNoise)+"deg\n"
+                    var.set ("The parameters and data selected is:\n EbN0 = "+str(EbN0db)+"\n Phase Noise = "+str(PhaseNoise)+"deg"+"\n Constallation: "+("16QAM \n" if MyTable==1 else "SpiralQAM \n")+"The text is: " + Data_TT)#
                 else:
-                    var.set ("The parameters and data selected is:\n EbN0 = "+str(EbN0db)+"\n Constallation: "+("16QAM \n" if MyTable==1 else "SpiralQAM \n")+"The Image is: ")#+"Phase Noise = "+str(PhaseNoise)+"deg\n"
+                    var.set ("The parameters and data selected is:\n EbN0 = "+str(EbN0db)+"\n Phase Noise = "+str(PhaseNoise)+"deg"+"\n Constallation: "+("16QAM \n" if MyTable==1 else "SpiralQAM \n")+"The Image is: ")#+"Phase Noise = "+str(PhaseNoise)+"deg\n"
                     f = Figure (figsize = (1,1),dpi = 100)
                     plt = f.add_subplot(111)
                     plt.imshow(Data_TT, cmap='gray')
@@ -361,7 +364,11 @@ class PageTwo (tk.Frame):
             else:
                 ModulationAndSend();
             
-                
+        def GoBack ():
+            button3 ['text'] ="Update"
+            var.set (" ")
+            controller.show_frame(PageOne)
+            
         label2 = tk.Label(self, textvariable = var , font = ("Verdana", 12),background= "white", anchor = "ne")
         
         label2.pack(side = "top",)#(row=1, column =0,padx = 0,pady=0, sticky ="nsew")
@@ -371,7 +378,7 @@ class PageTwo (tk.Frame):
         button2.pack(side = "bottom",anchor = "s")
         button2.config( height = 2, width = 10 )
         
-        button1 = tk.Button (self,text= "Back", command = lambda: controller.show_frame(PageOne))
+        button1 = tk.Button (self,text= "Back", command = lambda: GoBack ())
         button1.pack(side = "bottom",anchor = "s")
         button1.config( height = 2, width = 10 )
         
