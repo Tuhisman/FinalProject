@@ -62,7 +62,8 @@ SpiralQAMTable = {
     (1,1,1,1) : -1.9-3.9j
 }
 
-Data_RR = ""
+Data_RR_Noise = ""
+Data_RR_Refrence = ""
 MyTable = 1
 DataType = 1
 DataWNoise = np.array([])
@@ -128,17 +129,18 @@ def Demodulation (data_RX,TableIndex,NdataCarr):
     #fft
     OFDM_postFFT = np.fft.fft(OFDM_noCP)
     global PhaseNoise
-    noise_ph= np.random.normal(0 ,PhaseNoise*(pi/180) , len(OFDM_postFFT))
-    OFDM_postFFT = OFDM_postFFT*np.exp(1j*noise_ph)
-    
-    global DataWNoise
-    DataWNoise = np.append(DataWNoise , OFDM_postFFT)
+    if PhaseNoise:
+        noise_ph= np.random.normal(0 ,PhaseNoise*(pi/180) , len(OFDM_postFFT))
+        OFDM_postFFT = OFDM_postFFT*np.exp(1j*noise_ph)
     
     #Demapping
     data_rec = OFDM_postFFT [:,dataCarriers]
-
+        
     data_rec_reshape = data_rec.reshape(len(dataCarriers)*N_block,1)
     
+    global DataWNoise
+    DataWNoise = np.append(DataWNoise , data_rec_reshape[:NdataCarr])
+        
     distance = abs(data_rec_reshape.reshape((-1,1)) - constellation.reshape((1,-1)))
 
     const_index = distance.argmin(axis=1)
@@ -151,6 +153,7 @@ def Demodulation (data_RX,TableIndex,NdataCarr):
     bit_rec = bit_rec.reshape((-1,))
 
     return bit_rec[:(NdataCarr*qam_order)]
+
 
 def ReceiveData():
     
@@ -168,10 +171,29 @@ def ReceiveData():
     MyTable = settings_rec[0]
     global DataType
     DataType = settings_rec[3]
-#    global PhaseNoise
-#    PhaseNoise = settings_rec[4]
+    global PhaseNoise
+    PhaseNoise = 0
     
     data_bits_rec = np.array([])
+
+    for block in np.arange(settings_rec[1]):
+        (data,addr) = UDPSock.recvfrom(buf)
+        data_rec = np.fromstring(data, dtype = complex)
+        
+        if (block!=(settings_rec[1]-1)):
+            temp_data = Demodulation (data_rec,MyTable,52)
+        else:
+            temp_data = Demodulation (data_rec,MyTable,settings_rec[2])
+
+        data_bits_rec = np.append(data_bits_rec , temp_data)
+
+    global Data_RR_Refrence
+    Data_RR_Refrence = data_bits_rec.astype(int)
+
+    data_bits_rec = np.array([])
+    PhaseNoise = settings_rec[4]
+    global DataWNoise
+    DataWNoise = np.array([])
     
     for block in np.arange(settings_rec[1]):
         (data,addr) = UDPSock.recvfrom(buf)
@@ -186,8 +208,8 @@ def ReceiveData():
         
     UDPSock.close()
     
-    global Data_RR
-    Data_RR = data_bits_rec.astype(int)
+    global Data_RR_Noise
+    Data_RR_Noise = data_bits_rec.astype(int)
         
 class My_GUI (tk.Tk):
     
@@ -264,7 +286,7 @@ class PageOne (tk.Frame):
         
 
         #Main title
-        label = tk.Label(self, text = "\n          16QAM/Spiral-QAM Transmitter          \n", font = ("Verdana", 20))
+        label = tk.Label(self, text = "\n          16QAM/Spiral-QAM Reciever          \n", font = ("Verdana", 20))
         label.pack(side = "top", pady = 0)#(row=0, column =0,padx = 0,pady=0, sticky ="nsew")
         label.config(relief ="sunken")
         
@@ -275,12 +297,19 @@ class PageOne (tk.Frame):
         page1 = ttk.Frame(nb)
         page2 = ttk.Frame(nb)
         page3 = ttk.Frame(nb)
+        page4 = ttk.Frame(nb)
         nb.add(page1, text='Data Recieved')
         nb.add(page2, text='Constallation')
         nb.add(page3, text='Signal + Noise')
+        nb.add(page4, text='Statistics')
         nb.pack(expand=1, fill="y")
         
         def UpdateData():
+            global Data_RR_Noise
+            global Data_RR_Refrence
+            BadBits =np.sum(Data_RR_Refrence^Data_RR_Noise)
+            BER = BadBits/len(Data_RR_Refrence)
+            
             #Constallation
             global MyTable
             f = Figure (figsize = (3,3),dpi = 100)
@@ -303,20 +332,21 @@ class PageOne (tk.Frame):
             plt.grid(True)
             plt.set_xlim(-5, 5)
             plt.set_ylim(-5, 5)
-            
+#            plt.set_xlabel('Real part (I)') 
+#            plt.set_ylabel('Imaginary part (Q)')                  
             canvas = FigureCanvasTkAgg (f,page2)              
             page2.widget = canvas.get_tk_widget()        
             page2.widget.pack(side = "top",fill = "both") 
             
             #Modulated Data
-            global Data_RR
+
             if (DataType == 1):
                 TextBox = tk.Text (page1)#, width =35 , height = 5)
                 TextBox.pack(side = "top",fill = "both")
-                message = BinArray2String (Data_RR)
-                TextBox.insert (0.0 , message)
+                message_noise = BinArray2String (Data_RR_Noise)
+                TextBox.insert (0.0 , message_noise)
             else:
-                photo = BitsVec2Img(Data_RR)
+                photo = BitsVec2Img(Data_RR_Noise)
                 f = Figure (figsize = (3,3),dpi = 100)
                 plt = f.add_subplot(111)
                 plt.imshow(photo,cmap='gray')
@@ -350,13 +380,40 @@ class PageOne (tk.Frame):
             page3.widget = canvas.get_tk_widget()        
             page3.widget.pack(side = "top",fill = "both")
             
+            #Data No Noise
+
+            if (DataType == 1):
+                TextBox = tk.Text (page4)#, width =35 , height = 5)
+                TextBox.pack(side = "top",fill = "both")
+                message_no_noise = BinArray2String (Data_RR_Refrence)
+                toprint = "Text recieved without noise:\n"+message_no_noise+"\n\nText recieved with noise:\n"+message_noise
+                toprint = toprint+"\n\nThere is "+str(BadBits)+" wrong bits\nBER is: "+str(BER)
+                TextBox.insert (0.0 ,toprint) 
+            else:
+                photo = BitsVec2Img(Data_RR_Refrence)
+                f = Figure (figsize = (2,2),dpi = 100)
+                plt = f.add_subplot(111)
+                plt.imshow(photo,cmap='gray')
+                plt.grid(False)
+                plt.axis('off')
+                canvas = FigureCanvasTkAgg (f,page4)              
+                page4.widget = canvas.get_tk_widget()        
+                page4.widget.pack(side = "bottom" ,fill = "both")
+                TextBox = tk.Text (page4)#, width =35 , height = 5)
+                TextBox.pack(side = "top",fill = "both")
+                toprint = "There is "+str(BadBits)+" wrong bits\nBER is: "+str(BER)+"\nImage recieved without noise:"
+                TextBox.insert (0.0 ,toprint) 
+            
+            
+
+            
         button2 = tk.Button (self,text= "Quit", command = lambda: quitgui ())
         button2.pack(side = "bottom",anchor = "s")
         button2.config( height = 2, width = 10 )
         
-        button1 = tk.Button (self,text= "Back", command = lambda: controller.show_frame(StartPage))
-        button1.pack(side = "bottom",anchor = "s")
-        button1.config( height = 2, width = 10 )
+#        button1 = tk.Button (self,text= "Back", command = lambda: controller.show_frame(StartPage))
+#        button1.pack(side = "bottom",anchor = "s")
+#        button1.config( height = 2, width = 10 )
         
         button1 = tk.Button (self,text= "Update", command = lambda: UpdateData())
         button1.pack(side = "bottom",pady=(20, 0), anchor = "s")
